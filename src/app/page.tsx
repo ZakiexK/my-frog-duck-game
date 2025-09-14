@@ -118,7 +118,7 @@ export default function FrogDuckGame() {
         caughtTimeRef.current = Date.now();
       }
     }
-
+    // Speech bubble
     function drawBubble(
       text: string,
       x: number,
