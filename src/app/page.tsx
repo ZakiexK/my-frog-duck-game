@@ -1,103 +1,178 @@
-import Image from "next/image";
+"use client";
+import { useEffect, useRef, useState } from "react";
 
-export default function Home() {
+export default function GameCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [gameState, setGameState] = useState<"playing" | "caught">("playing");
+  const caughtTimeRef = useRef<number>(0);
+
+  // --- Messages ---
+  const messages = [
+    "Quack! 🐥",
+    "Can't catch me!",
+    "Need more breadcrumbs!",
+    "Too slow, froggy!",
+    "Zoom zoom!",
+  ];
+  const currentMessageRef = useRef("");
+  const messageTimeRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+
+    const duckImg = new Image();
+    duckImg.src = "/duck.png";
+    const frogImg = new Image();
+    frogImg.src = "/frog.png";
+
+    const duck = { x: 200, y: 150, speed: 3 };
+    const target = { x: duck.x, y: duck.y };
+    const frog = { x: 50, y: 50, speed: 2 };
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    // Controller
+    function setTarget(e: MouseEvent) {
+      if (gameState !== "playing") return;
+      const rect = canvas.getBoundingClientRect();
+      target.x = e.clientX - rect.left;
+      target.y = e.clientY - rect.top;
+    }
+    canvas.addEventListener("click", setTarget);
+
+    // Show random message every 2–4 seconds
+    let nextMessageAt = Date.now() + 2000;
+    function maybeShowMessage() {
+      if (gameState !== "playing") return;
+      const now = Date.now();
+      if (now >= nextMessageAt) {
+        currentMessageRef.current =
+          messages[Math.floor(Math.random() * messages.length)];
+        messageTimeRef.current = now;
+        nextMessageAt = now + 2000 + Math.random() * 2000;
+      }
+    }
+
+    function update() {
+      if (gameState !== "playing") return;
+
+      // Maybe show bubble
+      maybeShowMessage();
+
+      // Duck movement
+      const dx = target.x - duck.x;
+      const dy = target.y - duck.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 1) {
+        duck.x += (dx / dist) * duck.speed;
+        duck.y += (dy / dist) * duck.speed;
+      }
+
+      duck.x = Math.max(0, Math.min(canvas.width - 32, duck.x));
+      duck.y = Math.max(0, Math.min(canvas.height - 32, duck.y));
+
+      // Frog chases duck
+      const fx = duck.x - frog.x;
+      const fy = duck.y - frog.y;
+      const fDist = Math.hypot(fx, fy);
+      frog.x += (fx / fDist) * frog.speed;
+      frog.y += (fy / fDist) * frog.speed;
+
+      // Collision
+      if (fDist < 20 && gameState === "playing") {
+        setGameState("caught");
+        caughtTimeRef.current = Date.now();
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(duckImg, duck.x, duck.y, 32, 32);
+      ctx.drawImage(frogImg, frog.x, frog.y, 32, 32);
+
+      // Speech bubble (visible for 1.5s)
+      const showTime = 1500;
+      if (
+        gameState === "playing" &&
+        Date.now() - messageTimeRef.current < showTime &&
+        currentMessageRef.current
+      ) {
+        const text = currentMessageRef.current;
+        ctx.font = "16px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "white";
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 3;
+
+        const bubbleX = duck.x + 16;
+        const bubbleY = duck.y - 10;
+
+        // Background
+        const textWidth = ctx.measureText(text).width;
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(bubbleX - textWidth / 2 - 6, bubbleY - 20, textWidth + 12, 22);
+
+        // Text
+        ctx.fillStyle = "white";
+        ctx.fillText(text, bubbleX, bubbleY - 5);
+      }
+
+      // “Caught” animation
+      if (gameState === "caught") {
+        const t = Math.min(
+          1,
+          (Date.now() - caughtTimeRef.current) / 500
+        );
+        ctx.fillStyle = `rgba(255,0,0,${1 - t})`;
+        ctx.beginPath();
+        ctx.arc(duck.x + 16, duck.y + 16, 40 * t, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "white";
+        ctx.font = "24px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Caught!", duck.x + 16, duck.y - 20);
+      }
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    duckImg.onload = frogImg.onload = loop;
+    return () => {
+      window.removeEventListener("resize", resizeCanvas);
+      canvas.removeEventListener("click", setTarget);
+    };
+  }, [gameState]);
+
+  function resetGame() {
+    window.location.reload();
+  }
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+    <div>
+      <canvas
+        ref={canvasRef}
+        className="fixed top-0 left-0 w-screen h-screen"
+      />
+      {gameState === "caught" && (
+        <button
+          onClick={resetGame}
+          className="absolute top-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          Reset
+        </button>
+      )}
     </div>
   );
 }
