@@ -33,9 +33,9 @@ export default function FrogDuckGame() {
     ctx.imageSmoothingEnabled = false;
 
     const duckImg = new Image();
-    duckImg.src = "/duck.png";
+    duckImg.src = "/duck1.png";
     const frogImg = new Image();
-    frogImg.src = "/frog.png";
+    frogImg.src = "/frog1.png";
 
     const duck = { x: 200, y: 150, speed: 3 };
     const target = { x: duck.x, y: duck.y };
